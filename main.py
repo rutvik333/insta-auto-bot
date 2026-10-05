@@ -5,6 +5,7 @@ import feedparser
 import urllib.parse
 import textwrap
 import re
+import random
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from instagrapi import Client
 
@@ -22,7 +23,7 @@ def fetch_trending_news():
     if not feed.entries:
         raise Exception("No news found.")
         
-    top_entry = feed.entries[0]
+    top_entry = random.choice(feed.entries)
     title = top_entry.title
     
     if " - " in title:
@@ -44,37 +45,21 @@ def fetch_trending_news():
         
     return title, clean_sub
 
-def fetch_wikipedia_image(query):
-    words = [w for w in query.replace(':', '').replace('-', '').split() if len(w) > 4][:2]
-    search_term = " ".join(words) if words else query.split()[0]
-    search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(search_term)}&utf8=&format=json"
-    headers = {'User-Agent': 'InstaAutoBot/1.0'}
-    res = requests.get(search_url, headers=headers).json()
-    if not res['query']['search']: return None
-    page_title = res['query']['search'][0]['title']
-    img_url = f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(page_title)}&prop=pageimages&format=json&pithumbsize=1000"
-    res2 = requests.get(img_url, headers=headers).json()
-    pages = res2['query']['pages']
-    for page_id in pages:
-        if 'thumbnail' in pages[page_id]: return pages[page_id]['thumbnail']['source']
-    return None
-
 def fetch_relevant_image(query):
     print(f"Searching for image relevant to: {query}")
     img_url = None
     
     try:
-        from duckduckgo_search import DDGS
+        print("Scraping Bing Images...")
         search_query = query.replace("'", "").replace('"', "")
-        results = DDGS().images(search_query, max_results=2)
-        if results: img_url = results[0].get('image')
+        url = f"https://www.bing.com/images/search?q={urllib.parse.quote(search_query)}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        html = requests.get(url, headers=headers, timeout=10).text
+        m = re.findall(r'murl&quot;:&quot;(.*?)&quot;', html)
+        if m:
+            img_url = m[0]
     except Exception as e:
-        print(f"DuckDuckGo failed: {e}")
-        
-    if not img_url:
-        print("Trying Wikipedia...")
-        try: img_url = fetch_wikipedia_image(query)
-        except: pass
+        print(f"Bing search failed: {e}")
             
     if not img_url:
         print("Using generic fallback.")

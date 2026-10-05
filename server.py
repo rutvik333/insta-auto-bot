@@ -79,9 +79,9 @@ def index():
 @app.route("/preview", methods=["POST"])
 def preview():
     try:
-        headline = main.fetch_trending_news()
+        headline, subhead = main.fetch_trending_news()
         raw_img = main.fetch_relevant_image(headline)
-        final_img = main.format_image_for_instagram(raw_img)
+        final_img = main.format_image_for_instagram(raw_img, headline, subhead)
         
         caption = f"🚨 BREAKING NEWS 🚨\n\n{headline}\n\n#news #entertainment #marvel #hollywood #trending"
         
