@@ -33,13 +33,14 @@ def fetch_wikipedia_image(query):
     search_term = " ".join(words) if words else query.split()[0]
     
     search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(search_term)}&utf8=&format=json"
-    res = requests.get(search_url).json()
+    headers = {'User-Agent': 'InstaAutoBot/1.0 (https://github.com/rutvik333/insta-auto-bot)'}
+    res = requests.get(search_url, headers=headers).json()
     if not res['query']['search']:
         return None
         
     page_title = res['query']['search'][0]['title']
     img_url = f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(page_title)}&prop=pageimages&format=json&pithumbsize=1000"
-    res2 = requests.get(img_url).json()
+    res2 = requests.get(img_url, headers=headers).json()
     
     pages = res2['query']['pages']
     for page_id in pages:
