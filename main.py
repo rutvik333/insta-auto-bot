@@ -25,29 +25,63 @@ def fetch_trending_news():
         
     return title
 
+import urllib.parse
+
+def fetch_wikipedia_image(query):
+    # Use longest words from headline for better wiki match
+    words = [w for w in query.replace(':', '').replace('-', '').split() if len(w) > 4][:2]
+    search_term = " ".join(words) if words else query.split()[0]
+    
+    search_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(search_term)}&utf8=&format=json"
+    res = requests.get(search_url).json()
+    if not res['query']['search']:
+        return None
+        
+    page_title = res['query']['search'][0]['title']
+    img_url = f"https://en.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(page_title)}&prop=pageimages&format=json&pithumbsize=1000"
+    res2 = requests.get(img_url).json()
+    
+    pages = res2['query']['pages']
+    for page_id in pages:
+        if 'thumbnail' in pages[page_id]:
+            return pages[page_id]['thumbnail']['source']
+    return None
+
 def fetch_relevant_image(query):
     print(f"Searching for image relevant to: {query}")
-    # Simplify query for better image results
     search_query = query.replace("'", "").replace('"', "")
     
-    results = DDGS().images(search_query, max_results=5)
+    img_url = None
     
-    for r in results:
-        img_url = r.get('image')
-        if not img_url: continue
+    # 1. Try DuckDuckGo
+    try:
+        results = DDGS().images(search_query, max_results=2)
+        if results:
+            img_url = results[0].get('image')
+    except Exception as e:
+        print(f"DuckDuckGo blocked/failed (likely GitHub Actions IP block): {e}")
         
+    # 2. Try Wikipedia Fallback
+    if not img_url:
+        print("Trying Wikipedia Image Fallback...")
         try:
-            print(f"Downloading image: {img_url}")
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(img_url, headers=headers, timeout=10)
-            if response.status_code == 200:
-                with open("raw_image.jpg", 'wb') as f:
-                    f.write(response.content)
-                return "raw_image.jpg"
+            img_url = fetch_wikipedia_image(query)
         except Exception as e:
-            print(f"Failed to download {img_url}: {e}")
-            continue
+            print(f"Wikipedia search failed: {e}")
             
+    # 3. Last Resort Fallback (Generic Cinema Background)
+    if not img_url:
+        print("Using generic entertainment fallback image.")
+        img_url = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1080&auto=format&fit=crop"
+
+    print(f"Downloading image: {img_url}")
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    response = requests.get(img_url, headers=headers, timeout=10)
+    if response.status_code == 200:
+        with open("raw_image.jpg", 'wb') as f:
+            f.write(response.content)
+        return "raw_image.jpg"
+        
     raise Exception("Could not download any relevant image.")
 
 def format_image_for_instagram(image_path):
