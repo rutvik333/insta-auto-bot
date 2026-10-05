@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trigger Instagram Auto Poster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans p-4">
+
+    <div class="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
+        <h1 class="text-2xl font-bold text-gray-900 mb-6 text-center">Trigger Auto Poster</h1>
+        
+        <form id="triggerForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">GitHub Username</label>
+                <input type="text" id="ghUser" required placeholder="e.g. rutvik333" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Repository Name</label>
+                <input type="text" id="ghRepo" required placeholder="e.g. insta-auto-bot" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">GitHub Personal Access Token (PAT)</label>
+                <input type="password" id="ghToken" required placeholder="ghp_xxxxxxxxxxxx" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Needs `repo` scope to trigger workflows.</p>
+            </div>
+
+            <button type="submit" id="submitBtn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+                🚀 Trigger Post Now
+            </button>
+        </form>
+
+        <div id="statusMsg" class="mt-4 text-center text-sm font-semibold hidden"></div>
+    </div>
+
+    <script>
+        document.getElementById('triggerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const user = document.getElementById('ghUser').value.trim();
+            const repo = document.getElementById('ghRepo').value.trim();
+            const token = document.getElementById('ghToken').value.trim();
+            const btn = document.getElementById('submitBtn');
+            const status = document.getElementById('statusMsg');
+
+            btn.disabled = true;
+            btn.textContent = "Triggering...";
+            status.classList.add('hidden');
+
+            try {
+                // schedule.yml is the filename of our workflow
+                const response = await fetch(`https://api.github.com/repos/${user}/${repo}/actions/workflows/schedule.yml/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ref: 'main'
+                    })
+                });
+
+                status.classList.remove('hidden');
+                
+                if (response.ok) {
+                    status.textContent = "✅ Workflow triggered successfully! Check your GitHub Actions tab.";
+                    status.className = "mt-4 text-center text-sm font-semibold text-green-600";
+                } else {
+                    const error = await response.json();
+                    status.textContent = `❌ Error: ${error.message}`;
+                    status.className = "mt-4 text-center text-sm font-semibold text-red-600";
+                }
+            } catch (err) {
+                status.classList.remove('hidden');
+                status.textContent = `❌ Network Error: ${err.message}`;
+                status.className = "mt-4 text-center text-sm font-semibold text-red-600";
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "🚀 Trigger Post Now";
+            }
+        });
+    </script>
+</body>
+</html>

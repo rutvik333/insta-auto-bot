@@ -1,0 +1,5 @@
+instagrapi
+Pillow
+feedparser
+requests
+duckduckgo-search
