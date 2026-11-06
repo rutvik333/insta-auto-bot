@@ -293,8 +293,19 @@ def get_image():
     return "No image found", 404
 
 if __name__ == "__main__":
-    print("==================================================")
+    import socket
+    local_ip = "127.0.0.1"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        pass
+
+    print("=" * 60)
     print("🚀 INSTA AUTO BOT SERVER RUNNING!")
-    print("👉 Open in your browser: http://127.0.0.1:5000")
-    print("==================================================")
-    app.run(port=5000, debug=False)
+    print("👉 On this PC:     http://localhost:5000")
+    print(f"👉 On your Mobile: http://{local_ip}:5000")
+    print("=" * 60)
+    app.run(host="0.0.0.0", port=5000, debug=False)

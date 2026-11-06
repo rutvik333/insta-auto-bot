@@ -5,3 +5,4 @@ requests
 duckduckgo-search
 curl_cffi
 beautifulsoup4
+gunicorn
