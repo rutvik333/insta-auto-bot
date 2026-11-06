@@ -23,6 +23,9 @@ on:
           - 'screenrank'
           - 'rss'
 
+permissions:
+  contents: write
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
@@ -68,6 +71,15 @@ jobs:
           else
             python main.py
           fi
+
+      - name: Commit and push updated data
+        if: always()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add latest_data.json screenrank_latest.jpg post.jpg || true
+          git commit -m "Auto-update latest Facebook Screen Rank post data [skip ci]" || true
+          git push || true
 
       - name: Upload Output Artifacts
         if: always()

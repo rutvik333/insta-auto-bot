@@ -334,13 +334,15 @@ if __name__ == "__main__":
         else:
             data = get_latest_post(target, open_in_browser=open_browser)
 
-        if output_json:
+        if save_file:
             json_str = json.dumps(data, indent=2, ensure_ascii=False)
-            print(json_str)
-            if save_file:
-                with open(save_file, "w", encoding="utf-8") as f:
-                    f.write(json_str)
-                print(f"[✓] Saved JSON data to {save_file}")
+            save_path = save_file if os.path.isabs(save_file) else os.path.join(SCRIPT_DIR, save_file)
+            with open(save_path, "w", encoding="utf-8") as f:
+                f.write(json_str)
+            print(f"[✓] Saved JSON data to {save_path}")
+
+        if output_json:
+            print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
             print("=" * 65)
             print(f" Page Name:       {data['page_name']}")
