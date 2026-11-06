@@ -1,30 +1,81 @@
-name: Auto Instagram Poster
+name: Facebook & Instagram Auto Bot
 
 on:
   schedule:
     # Runs at 08:00 and 20:00 UTC every day (Twice a day)
     - cron: '0 8,20 * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'fetch_facebook_data'
+        type: choice
+        options:
+          - 'fetch_facebook_data'
+          - 'fetch_and_post_instagram'
+      source:
+        description: 'Content Source'
+        required: true
+        default: 'screenrank'
+        type: choice
+        options:
+          - 'screenrank'
+          - 'rss'
 
 jobs:
-  post:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
+          cache: 'pip'
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Auto Poster
+      - name: Run Facebook Screen Rank Extractor
+        if: "${{ github.event.inputs.action == 'fetch_facebook_data' || github.event_name == 'schedule' }}"
+        run: |
+          python facebook_scraper.py screenrank --download-img --save=latest_data.json
+          echo "### 🎬 Latest Screen Rank Facebook Post" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          import json
+          with open('latest_data.json', 'r', encoding='utf-8') as f:
+              d = json.load(f)
+          print(f\"- **Published:** {d.get('datetime_utc')} ({d.get('time_ago')})\")
+          print(f\"- **Post URL:** [{d.get('post_url')}]({d.get('post_url')})\")
+          print(f\"- **Engagement:** 👍 {d.get('reactions_count')} | 💬 {d.get('comments_count')} | 🔁 {d.get('shares_count')}\")
+          print(f\"- **Headline:** {d.get('headline')}\")
+          print(f\"\n> {d.get('full_text')}\n\")
+          " >> $GITHUB_STEP_SUMMARY
+
+      - name: Run Instagram Auto Poster
+        if: "${{ github.event.inputs.action == 'fetch_and_post_instagram' || (github.event_name == 'schedule' && env.IG_USERNAME != '') }}"
         env:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
-        run: python main.py
+        run: |
+          if [ "${{ github.event.inputs.source }}" = "rss" ]; then
+            python main.py --rss
+          else
+            python main.py
+          fi
+
+      - name: Upload Output Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-output-media
+          path: |
+            post.jpg
+            screenrank_latest.jpg
+            latest_data.json
+          if-no-files-found: ignore

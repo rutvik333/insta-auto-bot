@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 last_seen_post.json
 .env
+
