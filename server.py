@@ -4,6 +4,7 @@ import webbrowser
 from flask import Flask, request, render_template_string, send_file, redirect, url_for
 import main
 import facebook_scraper
+import image_cleaner
 
 app = Flask(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -221,6 +222,46 @@ def latest_data_json():
     if os.path.exists(data_path):
         return send_file(data_path, mimetype="application/json")
     return "{}", 404
+
+@app.route("/clean_image", methods=["POST"])
+def clean_image_api():
+    try:
+        data = request.get_json(silent=True) or request.form
+        mode = data.get("mode", "inpaint")
+        headline = data.get("headline", "")
+        img_url = data.get("image_url", "")
+        
+        src_path = os.path.join(SCRIPT_DIR, "screenrank_latest.jpg")
+        if (not os.path.exists(src_path) or os.path.getsize(src_path) < 1000) and img_url:
+            facebook_scraper.download_image(img_url, src_path)
+
+        out_name = "clean_image.jpg" if mode == "inpaint" else "clean_source.jpg"
+        out_path = os.path.join(SCRIPT_DIR, out_name)
+        
+        image_cleaner.clean_post_image(src_path, headline=headline, mode=mode, output_path=out_path)
+        
+        return {
+            "status": "success",
+            "mode": mode,
+            "clean_url": f"/{out_name}?t={time.time()}",
+            "filename": out_name
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.route("/clean_image.jpg")
+def serve_clean_image():
+    p = os.path.join(SCRIPT_DIR, "clean_image.jpg")
+    if os.path.exists(p):
+        return send_file(p, mimetype="image/jpeg")
+    return "No clean image found", 404
+
+@app.route("/clean_source.jpg")
+def serve_clean_source():
+    p = os.path.join(SCRIPT_DIR, "clean_source.jpg")
+    if os.path.exists(p):
+        return send_file(p, mimetype="image/jpeg")
+    return "No clean source found", 404
 
 @app.route("/open_facebook", methods=["POST", "GET"])
 def open_fb():

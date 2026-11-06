@@ -90,11 +90,52 @@
                 </div>
             </div>
 
-            <!-- Image Preview -->
-            <div id="imgContainer" class="hidden space-y-1">
-                <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Post Media</div>
-                <div class="bg-black rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center max-h-80">
-                    <img id="postImg" src="" alt="Post image" class="w-full h-auto max-h-80 object-contain mx-auto">
+            <!-- Image & Clean Studio Preview -->
+            <div id="imgContainer" class="hidden space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-image text-slate-400"></i> Post Media
+                    </span>
+                    <div id="viewTabs" class="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-700 text-[11px]">
+                        <button type="button" id="tabOriginal" onclick="switchView('original')" class="px-2.5 py-1 rounded bg-slate-800 text-white font-semibold">Original</button>
+                        <button type="button" id="tabClean" onclick="switchView('clean')" class="px-2.5 py-1 rounded text-slate-400 font-semibold hidden">Clean ✨</button>
+                    </div>
+                </div>
+
+                <div class="relative bg-black rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center max-h-80 group">
+                    <img id="postImg" src="" alt="Post image" class="w-full h-auto max-h-80 object-contain mx-auto transition duration-300">
+                    <div id="cleanBadge" class="absolute top-2 left-2 hidden bg-emerald-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Cleaned (Logo & Text Removed)
+                    </div>
+                </div>
+
+                <!-- Clean Actions Toolbar -->
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-700/80 space-y-2.5">
+                    <div class="flex items-center justify-between text-xs text-slate-300 font-bold">
+                        <span class="flex items-center gap-1.5">
+                            <i class="fa-solid fa-eraser text-pink-400"></i> Clean Image Studio:
+                        </span>
+                        <span id="cleanStatus" class="text-[11px] text-slate-400 font-normal"></span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <button type="button" id="inpaintBtn" onclick="requestCleanImage('inpaint')" class="py-2.5 px-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow shadow-purple-600/30">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Erase Logo & Text (AI)
+                        </button>
+                        <button type="button" id="cleanSourceBtn" onclick="requestCleanImage('clean_source')" class="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow shadow-indigo-600/30">
+                            <i class="fa-solid fa-magnifying-glass"></i> Find Clean Studio Photo
+                        </button>
+                    </div>
+
+                    <!-- Clean Image Actions (shown after cleaning) -->
+                    <div id="cleanDownloadBox" class="hidden pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                        <a id="downloadCleanLink" href="#" download="clean_image.jpg" target="_blank" class="text-emerald-400 hover:underline font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-download"></i> Download Clean Image
+                        </a>
+                        <button type="button" onclick="switchView('original')" class="text-[11px] text-slate-400 hover:text-white underline">
+                            View Original
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -141,6 +182,9 @@
             }).join(''));
         }
 
+        let originalImgUrl = '';
+        let cleanedImgUrl = '';
+
         // Render data into the result card
         function renderResultCard(data) {
             document.getElementById('postHeadline').textContent = data.headline || "No headline found";
@@ -157,10 +201,109 @@
             const imgEl = document.getElementById('postImg');
             const imgBox = document.getElementById('imgContainer');
             if (data.image_url) {
+                originalImgUrl = data.image_url;
                 imgEl.src = data.image_url;
                 imgBox.classList.remove('hidden');
+                // Check if clean image was already generated
+                checkCleanImageAvailability();
             } else {
                 imgBox.classList.add('hidden');
+            }
+        }
+
+        // Check if clean image exists locally or in repo
+        async function checkCleanImageAvailability() {
+            try {
+                const res = await fetch(`./clean_image.jpg?t=${Date.now()}`);
+                if (res.ok) {
+                    cleanedImgUrl = `./clean_image.jpg?t=${Date.now()}`;
+                    document.getElementById('tabClean').classList.remove('hidden');
+                }
+            } catch(e) {}
+        }
+
+        // Request image cleaning (inpaint or clean source)
+        async function requestCleanImage(mode) {
+            const status = document.getElementById('cleanStatus');
+            const inpaintBtn = document.getElementById('inpaintBtn');
+            const cleanSourceBtn = document.getElementById('cleanSourceBtn');
+            const headline = document.getElementById('postHeadline').textContent;
+
+            status.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-pink-400"></i> ${mode === 'inpaint' ? 'Erasing logo & text...' : 'Finding studio photo...'}`;
+            inpaintBtn.disabled = true;
+            cleanSourceBtn.disabled = true;
+
+            // 1. Try local server endpoint (/clean_image)
+            try {
+                const res = await fetch('/clean_image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode, headline: headline, image_url: originalImgUrl })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    cleanedImgUrl = data.clean_url;
+                    showCleanedImage(cleanedImgUrl, mode);
+                    status.innerHTML = `<span class="text-emerald-400 font-bold">✓ Clean image ready!</span>`;
+                    return;
+                }
+            } catch (e) {}
+
+            // 2. Try static repo file (clean_image.jpg or clean_source.jpg)
+            const targetFile = (mode === 'inpaint') ? 'clean_image.jpg' : 'clean_source.jpg';
+            try {
+                const staticRes = await fetch(`./${targetFile}?t=${Date.now()}`);
+                if (staticRes.ok) {
+                    cleanedImgUrl = `./${targetFile}?t=${Date.now()}`;
+                    showCleanedImage(cleanedImgUrl, mode);
+                    status.innerHTML = `<span class="text-emerald-400 font-bold">✓ Clean image loaded!</span>`;
+                    return;
+                }
+            } catch (e) {}
+
+            status.innerHTML = `<span class="text-rose-400">Run local server (python server.py) or GitHub Action to clean image.</span>`;
+            inpaintBtn.disabled = false;
+            cleanSourceBtn.disabled = false;
+        }
+
+        function showCleanedImage(url, mode) {
+            const imgEl = document.getElementById('postImg');
+            const cleanBadge = document.getElementById('cleanBadge');
+            const tabClean = document.getElementById('tabClean');
+            const downloadBox = document.getElementById('cleanDownloadBox');
+            const downloadLink = document.getElementById('downloadCleanLink');
+
+            imgEl.src = url;
+            cleanBadge.classList.remove('hidden');
+            cleanBadge.innerHTML = mode === 'inpaint'
+                ? `<i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Inpainted (Logo & Text Erased)`
+                : `<i class="fa-solid fa-camera mr-1"></i> Studio Master Photo`;
+
+            tabClean.classList.remove('hidden');
+            downloadBox.classList.remove('hidden');
+            downloadLink.href = url;
+            downloadLink.download = (mode === 'inpaint') ? 'clean_image.jpg' : 'clean_source.jpg';
+
+            tabClean.className = "px-2.5 py-1 rounded bg-purple-600 text-white font-semibold";
+            document.getElementById('tabOriginal').className = "px-2.5 py-1 rounded text-slate-400 font-semibold";
+
+            document.getElementById('inpaintBtn').disabled = false;
+            document.getElementById('cleanSourceBtn').disabled = false;
+        }
+
+        function switchView(view) {
+            const imgEl = document.getElementById('postImg');
+            const cleanBadge = document.getElementById('cleanBadge');
+            if (view === 'clean' && cleanedImgUrl) {
+                imgEl.src = cleanedImgUrl;
+                cleanBadge.classList.remove('hidden');
+                document.getElementById('tabClean').className = "px-2.5 py-1 rounded bg-purple-600 text-white font-semibold";
+                document.getElementById('tabOriginal').className = "px-2.5 py-1 rounded text-slate-400 font-semibold";
+            } else {
+                imgEl.src = originalImgUrl;
+                cleanBadge.classList.add('hidden');
+                document.getElementById('tabOriginal').className = "px-2.5 py-1 rounded bg-slate-800 text-white font-semibold";
+                document.getElementById('tabClean').className = "px-2.5 py-1 rounded text-slate-400 font-semibold";
             }
         }
 

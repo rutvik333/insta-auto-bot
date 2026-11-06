@@ -48,6 +48,8 @@ jobs:
         if: "${{ github.event.inputs.action == 'fetch_facebook_data' || github.event_name == 'schedule' }}"
         run: |
           python facebook_scraper.py screenrank --download-img --save=latest_data.json
+          python image_cleaner.py screenrank_latest.jpg || true
+          python image_cleaner.py --clean-source screenrank_latest.jpg || true
           echo "### 🎬 Latest Screen Rank Facebook Post" >> $GITHUB_STEP_SUMMARY
           python -c "
           import json
@@ -77,8 +79,8 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add latest_data.json screenrank_latest.jpg post.jpg || true
-          git commit -m "Auto-update latest Facebook Screen Rank post data [skip ci]" || true
+          git add latest_data.json screenrank_latest.jpg clean_image.jpg clean_source.jpg post.jpg || true
+          git commit -m "Auto-update latest Facebook Screen Rank post data & clean images [skip ci]" || true
           git push || true
 
       - name: Upload Output Artifacts
@@ -89,5 +91,7 @@ jobs:
           path: |
             post.jpg
             screenrank_latest.jpg
+            clean_image.jpg
+            clean_source.jpg
             latest_data.json
           if-no-files-found: ignore
