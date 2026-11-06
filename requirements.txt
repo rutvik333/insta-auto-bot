@@ -3,3 +3,5 @@ Pillow
 feedparser
 requests
 duckduckgo-search
+curl_cffi
+beautifulsoup4
