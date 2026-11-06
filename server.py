@@ -208,6 +208,20 @@ HTML = """
 def index():
     return render_template_string(HTML)
 
+@app.route("/trigger", methods=["GET"])
+def trigger_page():
+    trigger_path = os.path.join(SCRIPT_DIR, "index.html")
+    if os.path.exists(trigger_path):
+        return send_file(trigger_path)
+    return "Trigger page not found", 404
+
+@app.route("/latest_data.json", methods=["GET"])
+def latest_data_json():
+    data_path = os.path.join(SCRIPT_DIR, "latest_data.json")
+    if os.path.exists(data_path):
+        return send_file(data_path, mimetype="application/json")
+    return "{}", 404
+
 @app.route("/open_facebook", methods=["POST", "GET"])
 def open_fb():
     try:
